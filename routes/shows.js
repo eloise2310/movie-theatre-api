@@ -28,18 +28,35 @@ showsRouter.get("/:id", async (request, response) => {
 
 // DOESNT WORK ON POSTMAN
 // get all the users who have watched that show using an enpoint with a param (users/id/shows)
+// showsRouter.get("/:id/users", async (request, response) => {
+//     const showId = request.params.id;
+//     const show = await User.findByPk(showId, {
+//         include: [{ model: User, through: { attributes: [] }}] // ensures that User can be accessed
+//     });
+
+//     if(!show) {
+//         return response.status(404).json({ message: "Show not found"})
+//     }
+
+//     response.json(show.User) // returns the users who have watched that show
+// })
+
+// works :) 
+// get all the users who have watched that show using an enpoint with a param (shows/id/users)
 showsRouter.get("/:id/users", async (request, response) => {
-    const showId = request.params.id;
-    const show = await User.findByPk(showId, {
-        include: [{ model: User, through: { attributes: [] }}] // ensures that User can be accessed
-    });
-
-    if(!show) {
-        return response.status(404).json({ message: "Show not found"})
+    const showId = request.params.id
+    if(!(await Show.findByPk(showId))){
+        response.json({error: "Show not found"});
     }
-
-    response.json(show.User) // returns the users who have watched that show
+    const show = await Show.findByPk(showId, {
+        include: {
+            model: User,
+            through: { attributes: [] }
+        }
+    });
+    response.json(show.users)
 })
+
 
 // works :) 
 // put updates the info 
@@ -49,22 +66,40 @@ showsRouter.put("/:id", async (request, response) => {
     response.json(shows);
 })
 
-// DOESNT WORK
+// works :) 
 // update the 'available' property of a show using a put endpoint with a param
 // for example, /shows/3/available should update the third show in the database's available property to either true or false
 showsRouter.put("/:id/available", async (request, response) => {
     const showId = request.params.id;
     const available = request.body.available;
-    const show = await Show.findByPk(showId);
-    if (!show){
-        return response.status(404).json({ message: "Show not found"})
-    }
-    show.available = available
-    
-    await Show.update({ available }, { where: { id: showId } });
 
-    return response.status(200).json(show);
+    // Validate that available is a boolean
+    if (typeof available !== 'boolean') {
+        return response.status(400).json({ message: "'available' must be true or false" });
+    }
+
+    try {
+        const show = await Show.findByPk(showId);
+        if (!show) {
+            return response.status(404).json({ message: "Show not found" });
+        }
+
+        show.available = available;
+        await show.save();
+
+        return response.status(200).json(show);
+    } catch (error) {
+        return response.status(500).json({ message: "An error occurred", error });
+    }
 });
+
+// show router gets a particular genre using an endpoint with a query
+// for example /shows/action should return an array of shows from the database where the genre === action
+showsRouter.get("/:genre", async (request, response) => {
+    const showGenre = request.params.genre;
+    const shows = await Show.findAll({ where: { genre: showGenre }});
+    response.json(shows)
+})
 
 
 // deletes the info - deletes a show by the id num
@@ -77,7 +112,7 @@ showsRouter.delete("/:id", async (request, response) => {
 // checks all post - combine all posts together 
 showsRouter.post("/",  // checks that nothing is left blank
     [
-        check("title").not().isEmpty().trim().withMessage("Title is required"),
+        check("title").not().isEmpty().trim().withMessage("Title is required").isLength({ max: 25}).withMessage("Title cannot be over 25 characters"),
         check("genre").not().isEmpty().trim().withMessage("Genre is required"),
         check("rating").not().isEmpty().trim().withMessage("Rating is required"),
         check("available").not().isEmpty().trim().withMessage("Available is required"),

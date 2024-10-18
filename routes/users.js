@@ -6,7 +6,6 @@ const { User, Show } = require("../models/index")
 // include check and validationResult
 const { check, validationResult } = require("express-validator"); 
 
-
 usersRouter.use(express.json()); 
 usersRouter.use(express.urlencoded({extended: true})); 
 
@@ -26,33 +25,34 @@ usersRouter.get("/:id", async (request, response) => {
 })
 
 // DOESNT WORK - could not send request
+// usersRouter.get("/:id/shows", async (request, response) => {
+//     const id = request.params.id;
+//     const user = await User.findByPk(id, {
+//         include: Show  // ensures that Show can be accessed
+//     });
+
+//     if(!user) {
+//         return response.status(404).json({ message: "User not found"})
+//     }
+
+//     response.json(user.shows) // returns the atched by the user with that id 
+// })
+
+// works :) 
 // get all the shows watched by one user using an enpoint with a param (users/id/shows)
 usersRouter.get("/:id/shows", async (request, response) => {
-    const id = request.params.id;
-    const user = await User.findByPk(id, {
-        include: Show  // ensures that Show can be accessed
-    });
-
-    if(!user) {
-        return response.status(404).json({ message: "User not found"})
+    const userId = request.params.id
+    if(!(await User.findByPk(userId))){
+        response.json({error: "User not found"});
     }
-
-    response.json(user.shows) // returns the atched by the user with that id 
+    const user = await User.findByPk(userId, {
+        include: {
+            model: Show,
+            through: { attributes: [] }
+        }
+    });
+    response.json(user.shows)
 })
-
-// usersRouter.get("/:id/shows", async (request, response) => {
-//     const userId = request.params.id
-//     if(!(await User.findByPk(userId))){
-//         response.json({error: "User not found"});
-//     }
-//     const user = await User.findByPk(userId, {
-//         include: {
-//             model: Show,
-//             through: { attributes: [] }
-//         }
-//     });
-//     response.json(user.shows)
-// })
 
 // works :) 
 // put updates the info
@@ -65,22 +65,39 @@ usersRouter.put("/:id", async (request, response) => {
 // DOESNT WORK - comes back with error message 
 // associate a user with a show they have watched using a put endpoint
 // e.g. /users/2/shows/1 should update the third user in the database to have watched the first show in the data base
+// usersRouter.put("/:userId/shows/:showId", async (request, response) => {
+//     const userId = request.params.userId
+//     const showId = request.params.showId;
+//     const user = await User.findByPk(userId);
+//     const show = await Show.findByPk(showId);
+
+//     await user.addShow(show);
+
+//     let foundUser = await Show.findByPk(userId, {include: Show});
+//     response.json(foundUser)
+// });
+
+// works :) 
 usersRouter.put("/:userId/shows/:showId", async (request, response) => {
-    const userId = request.params.userId
+    const userId = request.params.userId;
     const showId = request.params.showId;
+
     const user = await User.findByPk(userId);
     const show = await Show.findByPk(showId);
 
-    if(!user) {
-        return response.status(404).json({ message: "User not found"});
+    if (!user) {
+        return response.status(404).json({ message: "User not found" });
     }
 
     if (!show) {
-        return response.status(404).json({ message: "Show not found"})
+        return response.status(404).json({ message: "Show not found" });
     }
 
     await user.addShow(show);
-})
+
+    const updatedUser = await User.findByPk(userId, { include: Show });
+    response.json(updatedUser);
+});
 
 // deletes the info 
 usersRouter.delete("/:id", async (request, response) => {
@@ -92,7 +109,7 @@ usersRouter.delete("/:id", async (request, response) => {
 // checks all post - combine all posts together 
 usersRouter.post("/", 
     [
-        check("username").not().isEmpty().trim().withMessage("Username is required"),
+        check("username").not().isEmpty().trim().withMessage("Username is required").isEmail().withMessage("Username must be an email"),
         check("password").not().isEmpty().trim().withMessage("Password is required"),
     ],
     async (request, response) => {

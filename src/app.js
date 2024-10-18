@@ -1,14 +1,11 @@
-// const express = require("express");
-// const app = express(); // create express server 
-// const PORT = 3000 // initialise on port 3000
+const express = require("express");
+const app = express();
+const showRouter = require("../routes/shows")
+const userRouter = require("../routes/users")
 
-// const User = require("../models/User");
-// const Show = require("../models/Show");
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use("/shows", showRouter);
+app.use("/users", userRouter);
 
-// const usersRouter = require("../routes/users")
-// const showsRouter = require("../routes/shows")
-
-// app.use(express.json());
-// app.use(express.urlencoded( { extended: true }));
-// app.use("/users", usersRouter)
-// app.use("/shows", showsRouter);
+module.exports = app;
